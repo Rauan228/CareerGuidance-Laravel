@@ -38,6 +38,7 @@ class ChartController extends Controller
         $type = request('type', 'days');
         $data = [];
         $labels = [];
+        $driver = \DB::getDriverName();
 
         if ($type === 'days') {
             // last 7 days
@@ -54,8 +55,13 @@ class ChartController extends Controller
         } elseif ($type === 'weeks') {
             // last 4 weeks (current week inclusive)
             $startOfWeek = Carbon::now()->startOfWeek(CarbonInterface::MONDAY)->subWeeks(3);
+            $yearWeekExpr = match ($driver) {
+                'mysql' => "YEARWEEK(created_at, 1)",
+                'pgsql' => "to_char(created_at, 'IYYYIW')",
+                default => "strftime('%G%V', created_at)",
+            };
             $results = CareerTestResult::where('created_at', '>=', $startOfWeek)
-                ->selectRaw('YEARWEEK(created_at, 1) as year_week, COUNT(*) as total')
+                ->selectRaw("$yearWeekExpr as year_week, COUNT(*) as total")
                 ->groupBy('year_week')
                 ->pluck('total', 'year_week');
             for ($i = 0; $i < 4; $i++) {
@@ -67,8 +73,13 @@ class ChartController extends Controller
         } elseif ($type === 'months') {
             // last 12 months (current month inclusive)
             $startOfMonth = Carbon::now()->startOfMonth()->subMonths(11);
+            $ymExpr = match ($driver) {
+                'mysql' => "DATE_FORMAT(created_at, '%Y-%m')",
+                'pgsql' => "to_char(created_at, 'YYYY-MM')",
+                default => "strftime('%Y-%m', created_at)",
+            };
             $results = CareerTestResult::where('created_at', '>=', $startOfMonth)
-                ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as ym, COUNT(*) as total')
+                ->selectRaw("$ymExpr as ym, COUNT(*) as total")
                 ->groupBy('ym')
                 ->pluck('total', 'ym');
             for ($i = 0; $i < 12; $i++) {

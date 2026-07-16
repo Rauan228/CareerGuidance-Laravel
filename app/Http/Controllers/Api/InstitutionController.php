@@ -16,30 +16,34 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class InstitutionController extends Controller
 {
+    public const INDEX_CACHE_KEY = 'api.institutions.index';
+
     public function index()
     {
         try {
-            \Log::info('Fetching all institutions');
-            
-            $institutions = Institution::with([
-                'specializations' => function($query) {
-                    $query->select('specializations.id', 'specializations.name', 'qualification_id')
-                        ->with(['qualification' => function($q) {
-                            $q->select('id', 'qualification_name');
-                        }]);
-                },
-                'collegeSpecializations' => function($query) {
-                    $query->select('college_specializations.id', 'college_specializations.name', 'college_qualification_id')
-                        ->with(['qualification' => function($q) {
-                            $q->select('id', 'qualification_name');
-                        }]);
-                },
-                'reviews',
-                'likes'
-            ])
-            ->withCount(['reviews', 'likes'])
-            ->withAvg('reviews', 'rating')
-            ->get(); // убрана пагинация
+            // Полные reviews/likes списку не нужны — фронт использует только
+            // reviews_count / likes_count / reviews_avg_rating.
+            // Кэшируем готовый JSON: БД удалённая, каждый запрос к ней дорогой.
+            $institutions = \Cache::remember(self::INDEX_CACHE_KEY, 300, function () {
+                return Institution::with([
+                    'specializations' => function($query) {
+                        $query->select('specializations.id', 'specializations.name', 'qualification_id')
+                            ->with(['qualification' => function($q) {
+                                $q->select('id', 'qualification_name');
+                            }]);
+                    },
+                    'collegeSpecializations' => function($query) {
+                        $query->select('college_specializations.id', 'college_specializations.name', 'college_qualification_id')
+                            ->with(['qualification' => function($q) {
+                                $q->select('id', 'qualification_name');
+                            }]);
+                    },
+                ])
+                ->withCount(['reviews', 'likes'])
+                ->withAvg('reviews', 'rating')
+                ->get()
+                ->toArray();
+            });
 
             return response()->json(['data' => $institutions]);
         } catch (\Exception $e) {
@@ -277,6 +281,8 @@ class InstitutionController extends Controller
             'comment' => $request->comment
         ]);
 
+        \Cache::forget(self::INDEX_CACHE_KEY);
+
         $review->load('user');
 
         return response()->json($review, 201);
@@ -308,6 +314,8 @@ class InstitutionController extends Controller
             $like->institution_id = $id;
             $like->save();
 
+            \Cache::forget(self::INDEX_CACHE_KEY);
+
             return response()->json($like, 201);
         } catch (\Exception $e) {
             \Log::error('Error adding like: ' . $e->getMessage());
@@ -328,6 +336,7 @@ class InstitutionController extends Controller
             }
 
             $like->delete();
+            \Cache::forget(self::INDEX_CACHE_KEY);
             return response()->json(null, 204);
         } catch (\Exception $e) {
             \Log::error('Error removing like: ' . $e->getMessage());

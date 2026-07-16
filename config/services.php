@@ -39,4 +39,14 @@ return [
         'key' => env('OPENAI_API_KEY'),
     ],
 
+    // Ollama на VPS — через отдельный nginx-прокси с Basic Auth (порт 11435)
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://178.88.115.213:11435'),
+        'model' => env('OLLAMA_MODEL', 'qwen2.5:7b-instruct'),
+        'user' => env('OLLAMA_USER', 'torap'),
+        'password' => env('OLLAMA_PASSWORD'),
+        // сколько секунд ждём генерацию (сервер общий и медленный — ждём долго)
+        'timeout' => (int) env('OLLAMA_TIMEOUT', 1740),
+    ],
+
 ];

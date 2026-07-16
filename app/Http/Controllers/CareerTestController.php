@@ -23,11 +23,28 @@ class CareerTestController extends Controller
         'answers'          => $data['answers'],
     ]);
 
-    // Генерация summary + рекомендаций
-    app(CareerOrientationService::class)->process($result);
+    // ИИ-анализ занимает минуты (общий медленный сервер), а artisan serve
+    // однопоточный — поэтому анализ уходит в ОТДЕЛЬНЫЙ фоновый php-процесс,
+    // а фронт поллит результат до появления summary.
+    $this->runAnalysisInBackground($result->id);
 
     return response()->json($result->fresh(), 201);
 }
+
+    /**
+     * Запускает `php artisan career-test:process {id}` фоном, не блокируя ответ.
+     */
+    private function runAnalysisInBackground(int $resultId): void
+    {
+        $php = escapeshellarg(PHP_BINARY);
+        $artisan = escapeshellarg(base_path('artisan'));
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            pclose(popen("start /B \"career-test\" {$php} {$artisan} career-test:process {$resultId}", 'r'));
+        } else {
+            exec("{$php} {$artisan} career-test:process {$resultId} > /dev/null 2>&1 &");
+        }
+    }
     public function index(Request $request)
     {
         $results = CareerTestResult::where('user_id', Auth::id())

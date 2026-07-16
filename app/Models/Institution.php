@@ -43,6 +43,13 @@ class Institution extends Authenticatable
 
     public function getLikesCountAttribute()
     {
+        // Не ходим в БД, если счётчик уже загружен через withCount()
+        if (array_key_exists('likes_count', $this->attributes)) {
+            return (int) $this->attributes['likes_count'];
+        }
+        if ($this->relationLoaded('likes')) {
+            return $this->likes->count();
+        }
         return $this->likes()->count();
     }
 

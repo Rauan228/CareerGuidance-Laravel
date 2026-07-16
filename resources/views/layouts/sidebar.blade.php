@@ -257,7 +257,7 @@
     <div class="sidebar">
         <div class="navbar">
             <img src="{{ asset('B_B.png') }}" alt="logo">
-            <span>Berufsberatung</span>
+            <span>Torap</span>
         </div>
 
         <a href="{{ route('home') }}">
