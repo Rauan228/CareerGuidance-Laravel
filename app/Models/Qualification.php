@@ -14,7 +14,9 @@ class Qualification extends Model
     protected $table = 'qualifications';
 
     protected $fillable = [
-        'qualification_name'
+        'qualification_name',
+        'global_specialty_id',
+        'description',
     ];
 
     public function globalSpecialty(): BelongsTo

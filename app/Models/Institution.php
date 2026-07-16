@@ -20,6 +20,7 @@ class Institution extends Authenticatable
         'description2',
         'description3',
         'location',
+        'address',
         'email',
         'phone',
         'website',
@@ -108,6 +109,11 @@ class Institution extends Authenticatable
     private function makeAbsoluteUrl($path)
     {
         if (!$path) return null;
+
+        // Уже абсолютный URL (из скрапера/сидера) — не гоняем через Storage
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
 
         $url = Storage::url($path); // /storage/...
 
