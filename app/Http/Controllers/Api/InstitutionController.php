@@ -56,26 +56,30 @@ class InstitutionController extends Controller
     public function show($id)
     {
         try {
-            $institution = Institution::with([
-                'specializations' => function($query) {
-                    $query->with(['qualification' => function($q) {
-                        $q->select('id', 'qualification_name');
+            // Отзывы и лайки страницы «О вузе» получают отдельными эндпоинтами —
+            // здесь они не нужны. БД удалённая, поэтому кэшируем готовый ответ.
+            $institution = \Cache::remember("api.institutions.show.{$id}", 300, function () use ($id) {
+                $institution = Institution::with([
+                    'specializations' => function($query) {
+                        $query->with(['qualification' => function($q) {
+                            $q->select('id', 'qualification_name');
+                        }]);
+                    },
+                ])->findOrFail($id);
+
+                if ($institution->type === 'college') {
+                    $institution->load(['collegeSpecializations' => function ($query) {
+                        $query->select('college_specializations.id', 'college_specializations.name', 'college_qualification_id')
+                            ->with(['qualification:id,qualification_name,description'])
+                            ->withPivot('cost', 'duration');
                     }]);
-                },
-                'reviews.user',
-                'likes'
-            ])->findOrFail($id);
 
-            if ($institution->type === 'college') {
-                $institution->load(['collegeSpecializations' => function ($query) use ($id) {
-                    $query->select('college_specializations.id', 'college_specializations.name', 'college_qualification_id')
-                        ->with(['qualification:id,qualification_name,description'])
-                        ->withPivot('cost', 'duration');
-                }]);
+                    // Устанавливаем специальности колледжа в свойство specializations
+                    $institution->setRelation('specializations', $institution->collegeSpecializations);
+                }
 
-                // Устанавливаем специальности колледжа в свойство specializations
-                $institution->setRelation('specializations', $institution->collegeSpecializations);
-            }
+                return $institution->toArray();
+            });
 
             return response()->json($institution);
         } catch (ModelNotFoundException $e) {

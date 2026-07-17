@@ -1,0 +1,112 @@
+{
+  "_meta": {
+    "note": "Официальные/опубликованные тарифы бакалавриата (₸/год). fill_null_only=true — ставим только где cost пустой.",
+    "sources": [
+      "https://nu.edu.kz/admissions/fees-and-funding/ (UG $15000 × 507 KZT)",
+      "https://apply.nu.edu.kz (7 665 000 ₸ UG 2025/26)",
+      "LS/Kursiv/Lada 2025 reviews: Satbayev, KBTU, KazNU, Narxoz, ENU"
+    ]
+  },
+  "by_institution_id": {
+    "1": {
+      "name": "Назарбаев Университет",
+      "fill_null_only": false,
+      "default_cost": 7605000,
+      "default_duration": 4,
+      "note": "Undergraduate $15,000; rate 507 KZT/USD (official NU). Nursing special: 3066000 if name matches."
+    },
+    "2": {
+      "name": "ЕНУ Гумилева",
+      "fill_null_only": true,
+      "default_cost": 1500000,
+      "default_duration": 4,
+      "note": "Диапазон ~1.35–1.6 млн; default mid для пустых"
+    },
+    "9": {
+      "name": "Astana IT University",
+      "fill_null_only": true,
+      "default_cost": 2500000,
+      "default_duration": 3,
+      "note": "vipusknik/офиц. прайс AITU часто 2.5 млн"
+    },
+    "7": {
+      "name": "MNU / КАЗГЮУ",
+      "fill_null_only": true,
+      "default_cost": 1800000,
+      "default_duration": 4
+    },
+    "63": {
+      "name": "Satbayev University",
+      "fill_null_only": true,
+      "default_cost": 1100000,
+      "default_duration": 4,
+      "note": "Публикации 2025: ~905k–1.3 млн"
+    },
+    "82": {
+      "name": "КазНУ аль-Фараби",
+      "fill_null_only": true,
+      "default_cost": 1200000,
+      "default_duration": 4,
+      "note": "Публикации 2025: от 500k (сестринское) до ~1.7 млн"
+    },
+    "84": {
+      "name": "КБТУ",
+      "fill_null_only": true,
+      "default_cost": 2400000,
+      "default_duration": 4,
+      "note": "Публикации 2025: ~2.1–3.0 млн"
+    },
+    "91": {
+      "name": "Нархоз",
+      "fill_null_only": true,
+      "default_cost": 1600000,
+      "default_duration": 4,
+      "note": "Кредитная модель ~1.3–1.86 млн/год"
+    },
+    "89": {
+      "name": "IITU",
+      "fill_null_only": true,
+      "default_cost": 1500000,
+      "default_duration": 4
+    },
+    "81": {
+      "name": "КазНПУ Абая",
+      "fill_null_only": true,
+      "default_cost": 1000000,
+      "default_duration": 4
+    },
+    "93": {
+      "name": "КИМЭП",
+      "fill_null_only": true,
+      "default_cost": 2800000,
+      "default_duration": 4
+    },
+    "55": {
+      "name": "AlmaU",
+      "fill_null_only": true,
+      "default_cost": 1800000,
+      "default_duration": 4
+    },
+    "4": {
+      "name": "МУА",
+      "fill_null_only": true,
+      "default_cost": 1500000,
+      "default_duration": 5
+    },
+    "3": {
+      "name": "КазАТИУ",
+      "fill_null_only": true,
+      "default_cost": 1100000,
+      "default_duration": 4
+    }
+  },
+  "name_rules": [
+    {
+      "institution_id": 1,
+      "match": "(?i)nurs",
+      "cost": 3066000,
+      "duration": 4,
+      "note": "Bachelor in Nursing official NU"
+    }
+  ]
+}
