@@ -14,30 +14,28 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Сначала создаем учреждения (institutions)
+        // 1. Учреждения (карточки вузов/колледжей)
         $this->call(InstitutionsTableSeeder::class);
-        // Добавляем направления для учреждений
         $this->call(InstitutionDirectionsSeeder::class);
 
-        // 2. Создаем специальности университетов
-        $this->call(UniversitySpecialtiesSeeder::class);
-        
-        // 3. Создаем специальности колледжей
-        $this->call(CollegeSpecialtiesSeeder::class);
+        // ── Специальности ────────────────────────────────────────────────
+        // НЕ сидим specialty-каталог и случайные institution_specialties.
+        // Источник истины — парсинг + импорт:
+        //   php artisan data:import-scraped path/to/vipusknik_*.json
+        //   php artisan data:import-official-programs path/to/official_programs.json --replace
+        //   php artisan data:clean-specialties
+        //   php artisan data:purge-seed-specialties   # если снова затесался seed
+        //
+        // Устаревшие сидеры (оставляем в репо только как архив, не вызываем):
+        //   UniversitySpecialtiesSeeder, CollegeSpecialtiesSeeder,
+        //   InstitutionSpecialtiesSeeder, CollegeInstitutionSpecsSeeder,
+        //   SpecializationAboutSeeder, CollegeSpecializationAboutSeeder
 
-        // 4. Создаем связи специальностей с учреждениями
-        $this->call(InstitutionSpecialtiesSeeder::class);
-        $this->call(CollegeInstitutionSpecsSeeder::class);
-
-        // 5. Добавляем дополнительную информацию о специальностях
-        $this->call(SpecializationAboutSeeder::class);
-        $this->call(CollegeSpecializationAboutSeeder::class);
-
-        // 6. Создаем пользователей и администраторов
+        // 2. Пользователи и администраторы
         $this->call(UsersTableSeeder::class);
         $this->call(AdminsTableSeeder::class);
 
-        // 7. Создаем контент (события, заявки, уведомления и т.д.)
+        // 3. Контент
         $this->call([
             EventsCalendarTableSeeder::class,
             ApplicationsTableSeeder::class,
@@ -47,14 +45,14 @@ class DatabaseSeeder extends Seeder
             LikesTableSeeder::class,
         ]);
 
-        // 8. Создаем дефолтного админа
+        // 4. Дефолтный админ
         Admin::create([
             'name' => 'admin',
             'email' => 'admin@admin.com',
             'password' => Hash::make('password'),
         ]);
 
-        // 9. Создаем тестовых пользователей
+        // 5. Тестовые пользователи
         User::factory()->count(20)->create();
 
         $this->call(TestResultsTableSeeder::class);

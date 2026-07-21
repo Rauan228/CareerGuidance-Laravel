@@ -110,7 +110,9 @@ Route::prefix('college-specializations')->group(function () {
 });
 
 Route::get('specializations/{id}/institutions', [SpecializationController::class, 'institutions']);
-Route::get('specialties/{id}', [SpecializationController::class, 'show']);
+// ВАЖНО: /specialties/{id} уже обрабатывается GlobalSpecialtyController::show (направление).
+// Дубль с SpecializationController здесь перебивал его и возвращал конкретную специализацию —
+// из-за этого в шапке квалификаций показывалось не то название. Специализация по id — через /specializations/{id}.
 Route::get('specializations/{id}', [SpecializationController::class, 'show']);
 
 Route::middleware('api')->group(function () {

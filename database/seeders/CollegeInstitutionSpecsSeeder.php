@@ -5,6 +5,10 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @deprecated Не вызывать. Ровно 60 случайных ОП на каждый колледж.
+ * Чистка: data:purge-seed-specialties
+ */
 class CollegeInstitutionSpecsSeeder extends Seeder
 {
     /**

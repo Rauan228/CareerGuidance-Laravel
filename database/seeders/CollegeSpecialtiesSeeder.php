@@ -7,6 +7,10 @@ use App\Models\CollegeGlobalSpecialty;
 use App\Models\CollegeQualification;
 use App\Models\CollegeSpecialization;
 
+/**
+ * @deprecated Не вызывать. Фейковое дерево ОП колледжей.
+ * Чистка: data:purge-seed-specialties
+ */
 class CollegeSpecialtiesSeeder extends Seeder
 {
     public function run()

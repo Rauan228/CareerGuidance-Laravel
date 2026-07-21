@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Log;
 use App\Models\CollegeSpecialization;
 use App\Models\Specialization;
 
+/**
+ * @deprecated Не вызывать. Рандомные specialty-links (24–52 на вуз).
+ * Источник истины: парсинг. Чистка: data:purge-seed-specialties
+ */
 class InstitutionSpecialtiesSeeder extends Seeder
 {
     /**

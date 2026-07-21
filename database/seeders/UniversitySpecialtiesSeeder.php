@@ -7,6 +7,11 @@ use App\Models\GlobalSpecialty;
 use App\Models\Qualification;
 use App\Models\Specialization;
 
+/**
+ * @deprecated Не вызывать. Фейковый каталог ОП до парсинга.
+ * Источник истины: data:import-scraped / data:import-official-programs.
+ * Чистка: php artisan data:purge-seed-specialties
+ */
 class UniversitySpecialtiesSeeder extends Seeder
 {
     public function run()

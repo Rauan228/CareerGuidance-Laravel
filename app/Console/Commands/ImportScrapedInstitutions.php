@@ -2,10 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\GlobalSpecialty;
 use App\Models\Institution;
-use App\Models\Qualification;
-use App\Models\Specialization;
+use App\Services\UniversitySpecialtyTree;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,15 +11,22 @@ use Illuminate\Support\Facades\Hash;
 /**
  * Импорт JSON из data-scrapers/output/vipusknik_astana.json
  *
+ * Иерархия ОП 1:1 как у вуза (через UniversitySpecialtyTree):
+ *   global_specialty → qualification (код · группа) → specialization (ОП)
+ *
  * php artisan data:import-scraped "../data-scrapers/output/vipusknik_astana.json"
- * php artisan data:import-scraped "../data-scrapers/output/vipusknik_astana.json" --dry-run
+ * php artisan data:import-scraped path.json --update --replace-specialties
+ * php artisan data:import-scraped path.json --dry-run
+ *
+ * Полная пересборка каталога: data:rebuild-university-specialties
  */
 class ImportScrapedInstitutions extends Command
 {
     protected $signature = 'data:import-scraped
         {path : Path to vipusknik_astana.json (or similar)}
         {--dry-run : Parse and report without writing DB}
-        {--update : Update existing institutions matched by name}';
+        {--update : Update existing institutions matched by name}
+        {--replace-specialties : Перед импортом удалить specialty-links вуза}';
 
     protected $description = 'Import scraped Astana institutions + specialties + prices into DB';
 
@@ -40,13 +45,15 @@ class ImportScrapedInstitutions extends Command
         }
 
         $payload = json_decode(file_get_contents($path), true);
-        if (!$payload || empty($payload['institutions'])) {
-            $this->error('Invalid JSON or empty institutions[]');
+        if (!$payload) {
+            $this->error('Invalid JSON');
             return self::FAILURE;
         }
 
         $dry = (bool) $this->option('dry-run');
         $update = (bool) $this->option('update');
+        $replaceSpecs = (bool) $this->option('replace-specialties');
+        $tree = app(UniversitySpecialtyTree::class);
 
         $stats = [
             'institutions_created' => 0,
@@ -58,22 +65,28 @@ class ImportScrapedInstitutions extends Command
             'errors' => 0,
         ];
 
+        $list = $payload['institutions'] ?? (is_array($payload) && array_is_list($payload) ? $payload : []);
+        if (!$list) {
+            $this->error('Invalid JSON or empty institutions[]');
+            return self::FAILURE;
+        }
+
         $this->info(sprintf(
             'Importing %d institutions from %s%s',
-            count($payload['institutions']),
+            count($list),
             $path,
             $dry ? ' [DRY-RUN]' : ''
         ));
 
-        $runner = function () use ($payload, $dry, $update, &$stats) {
-            foreach ($payload['institutions'] as $row) {
+        $runner = function () use ($list, $dry, $update, $replaceSpecs, $tree, &$stats) {
+            foreach ($list as $row) {
                 if (!empty($row['error']) || empty($row['name'])) {
                     $stats['institutions_skipped']++;
                     continue;
                 }
 
                 try {
-                    $this->importOne($row, $dry, $update, $stats);
+                    $this->importOne($row, $dry, $update, $replaceSpecs, $tree, $stats);
                 } catch (\Throwable $e) {
                     $stats['errors']++;
                     $this->warn("  ! {$row['name']}: {$e->getMessage()}");
@@ -95,7 +108,9 @@ class ImportScrapedInstitutions extends Command
 
     private function findExistingInstitution(string $name, array $row): ?Institution
     {
-        $exact = Institution::where('name', $name)->first();
+        $wantType = (($row['type'] ?? 'university') === 'college') ? 'college' : 'university';
+
+        $exact = Institution::where('name', $name)->where('type', $wantType)->first();
         if ($exact) {
             return $exact;
         }
@@ -108,12 +123,20 @@ class ImportScrapedInstitutions extends Command
             $host = parse_url($website, PHP_URL_HOST);
             if ($host) {
                 $host = preg_replace('/^www\./', '', strtolower($host));
-                $candidates = Institution::whereNotNull('website')
+                $candidates = Institution::where('type', $wantType)
+                    ->whereNotNull('website')
                     ->where('website', 'like', '%' . $host . '%')
+                    ->orderBy('id')
                     ->get();
                 foreach ($candidates as $byWeb) {
                     $instCity = $this->cityKey($byWeb->location ?? $byWeb->address ?? '');
                     if ($rowCity !== '' && $instCity !== '' && $rowCity !== $instCity) {
+                        continue;
+                    }
+                    // don't glue college brand to university card and vice versa
+                    $aCollege = str_contains(mb_strtolower($name), 'колледж') || str_contains(mb_strtolower($name), 'college');
+                    $bCollege = str_contains(mb_strtolower($byWeb->name), 'колледж') || str_contains(mb_strtolower($byWeb->name), 'college');
+                    if ($aCollege !== $bCollege) {
                         continue;
                     }
                     if ($this->namesRelated($name, $byWeb->name)) {
@@ -225,8 +248,14 @@ class ImportScrapedInstitutions extends Command
         return $overlap >= 1;
     }
 
-    private function importOne(array $row, bool $dry, bool $update, array &$stats): void
-    {
+    private function importOne(
+        array $row,
+        bool $dry,
+        bool $update,
+        bool $replaceSpecs,
+        UniversitySpecialtyTree $tree,
+        array &$stats
+    ): void {
         $name = trim($row['name']);
         $existing = $this->findExistingInstitution($name, $row);
 
@@ -295,83 +324,38 @@ class ImportScrapedInstitutions extends Command
             return;
         }
 
+        if (!$dry && $replaceSpecs && $institutionId) {
+            DB::table('institution_specialties')->where('institution_id', $institutionId)->delete();
+        }
+
         foreach ($specialties as $spec) {
-            $specName = trim($spec['name'] ?? '');
-            if ($specName === '') {
-                continue;
-            }
-
-            $globalName = trim($spec['global_specialty'] ?? 'Прочее') ?: 'Прочее';
-            $code = $spec['code'] ?? null;
-            $cost = $spec['cost'] ?? null;
-            $duration = $spec['duration'] ?? null;
-
             if ($dry) {
                 $stats['specializations_created']++;
                 $stats['links_created']++;
                 continue;
             }
 
-            $global = GlobalSpecialty::firstOrCreate(
-                ['name' => $globalName],
-                ['description' => $code ? "Код: {$code}" : null]
-            );
-
-            $qualName = $code ? "{$globalName} ({$code})" : $globalName;
-            $qualification = Qualification::firstOrCreate(
-                [
-                    'qualification_name' => $qualName,
-                    'global_specialty_id' => $global->id,
-                ]
-            );
-
-            // ensure global_specialty_id if fillable/column allows but firstOrCreate key missed it on old rows
-            if (!$qualification->global_specialty_id) {
-                $qualification->global_specialty_id = $global->id;
-                $qualification->save();
+            $node = $tree->ensureProgram($spec);
+            if (!$node) {
+                continue;
             }
-
-            $specialization = Specialization::firstOrCreate(
-                [
-                    'name' => $specName,
-                    'qualification_id' => $qualification->id,
-                ],
-                [
-                    'description' => $code ? "Код группы: {$code}" : null,
-                ]
-            );
-            if ($specialization->wasRecentlyCreated) {
+            if ($node['created_spec']) {
                 $stats['specializations_created']++;
             }
-
             if (!$institutionId) {
                 continue;
             }
 
-            $exists = DB::table('institution_specialties')
-                ->where('institution_id', $institutionId)
-                ->where('university_specialization_id', $specialization->id)
-                ->first();
-
-            if ($exists) {
-                DB::table('institution_specialties')
-                    ->where('id', $exists->id)
-                    ->update([
-                        'cost' => $cost ?? $exists->cost,
-                        'duration' => $duration ?? $exists->duration,
-                        'updated_at' => now(),
-                    ]);
-                $stats['links_updated']++;
-            } else {
-                DB::table('institution_specialties')->insert([
-                    'institution_id' => $institutionId,
-                    'university_specialization_id' => $specialization->id,
-                    'cost' => $cost,
-                    'duration' => $duration,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            $result = $tree->linkToInstitution(
+                $institutionId,
+                $node['specialization'],
+                $spec['cost'] ?? null,
+                $spec['duration'] ?? null
+            );
+            if ($result === 'created') {
                 $stats['links_created']++;
+            } elseif ($result === 'updated') {
+                $stats['links_updated']++;
             }
         }
     }
